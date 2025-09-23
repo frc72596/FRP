@@ -31,6 +31,12 @@ summary(fit_prosocial, fit.measures = TRUE, standardized = TRUE)
 lavaanPlot(model = fit_prosocial,node_options = list(shape = "box", fontname = "Helvetica"), edge_options = list(color = "grey"), coefs = TRUE, stand = TRUE,covs = TRUE, stars = "covs")
 alpha(PRO_ANA)
 reliability(PRO_ANA)
+omega(PRO_ANA)
+#modelo final-version definitiva de Prosocialidad
+
+
+
+
 HIJOS_RGE <- HIJOS[, c("RGE1","RGE2","RGE3","RGE4","RGE5",
                        "RGE6","RGE7","RGE8","RGE9","RGE10")]
 REG_IMP<-amelia(HIJOS_RGE, ords =c("RGE1","RGE2","RGE3","RGE4","RGE5",
@@ -80,6 +86,30 @@ alpha(PAD_Certeza)
 reliability(PAD_Certeza)
 alpha(PAD_InteresCuriosidad)
 reliability(PAD_InteresCuriosidad)
+
+#modelo2-FRP
+modelo_PAD2<- '
+  # Factor 1: Prementalización
+  Prementalizacion =~ FR1 + FR4 + FR7 + FR10 + FR13 + FR16
+  # Factor 2: Certeza en estados mentales
+  Certeza =~ FR2 + FR5 + FR8 + FR14 + FR17
+  # Factor 3: Interés y curiosidad
+  InteresCuriosidad =~ FR3 + FR6 + FR9 + FR12 + FR15
+'
+fit_PAD2 <- cfa(modelo_PAD2, 
+               data = PAD_ANA, 
+               estimator = "WLSMV", ordered = c("FR1","FR2","FR3","FR4","FR5","FR6","FR7","FR8","FR9",
+                                                "FR10","FR11","FR12","FR13","FR14","FR15","FR16","FR17","FR18"))               
+summary(fit_PAD2, fit.measures = TRUE, standardized = TRUE)
+lavaanPlot(model = fit_PAD2,node_options = list(shape = "box", fontname = "Helvetica"), edge_options = list(color = "grey"), coefs = TRUE, stand = TRUE,covs = TRUE, stars = "covs")
+PAD_Prementalizacion2 <- PAD_ANA[, c("FR1","FR4","FR7","FR10","FR13","FR16")]
+PAD_Certeza2 <- PAD_ANA[, c("FR2","FR5","FR8","FR14","FR17")]
+PAD_InteresCuriosidad2 <- PAD_ANA[, c("FR3","FR6","FR9","FR12","FR15")]
+alpha(PAD_Certeza2)
+reliability(PAD_Certeza2)
+alpha(PAD_InteresCuriosidad2)
+reliability(PAD_InteresCuriosidad2)
+#Diadas
 HI_F_C<- HI_F[!is.na(HI_F$ID_HIJ)   & HI_F$ID_HIJ   != "", ]
 DIAD<- merge(PAD_V1_C, HI_F_C, by = "ID_HIJ")
 items_PAD <- c(

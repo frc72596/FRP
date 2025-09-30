@@ -32,11 +32,19 @@ lavaanPlot(model = fit_prosocial,node_options = list(shape = "box", fontname = "
 alpha(PRO_ANA)
 reliability(PRO_ANA)
 omega(PRO_ANA)
-#modelo final-version definitiva de Prosocialidad
-
-
-
-
+#modelo final-version definitiva de Prosocialidad sin 10
+modelo_prosocial2<- '
+  ConductaProsocial =~ CP1 + CP2 + CP4 + CP5 +
+                       CP7 + CP9 + CP12 +
+                       CP13 + CP15
+'
+fit_prosocial2 <- cfa(modelo_prosocial2, 
+                     data = PRO_ANA, 
+                     estimator = "WLSMV", 
+                     ordered = c("CP1","CP2","CP4","CP5",
+                                 "CP7","CP9","CP12",
+                                 "CP13","CP15"))
+lavaanPlot(model = fit_prosocial2,node_options = list(shape = "box", fontname = "Helvetica"), edge_options = list(color = "grey"), coefs = TRUE, stand = TRUE,covs = TRUE, stars = "covs")
 HIJOS_RGE <- HIJOS[, c("RGE1","RGE2","RGE3","RGE4","RGE5",
                        "RGE6","RGE7","RGE8","RGE9","RGE10")]
 REG_IMP<-amelia(HIJOS_RGE, ords =c("RGE1","RGE2","RGE3","RGE4","RGE5",
@@ -86,7 +94,6 @@ alpha(PAD_Certeza)
 reliability(PAD_Certeza)
 alpha(PAD_InteresCuriosidad)
 reliability(PAD_InteresCuriosidad)
-
 #modelo2-FRP
 modelo_PAD2<- '
   # Factor 1: Prementalización
@@ -110,6 +117,63 @@ reliability(PAD_Certeza2)
 alpha(PAD_InteresCuriosidad2)
 reliability(PAD_InteresCuriosidad2)
 #Diadas
+HIJOS$llave <- ifelse(!is.na(HIJOS$ID_HIJ), HIJOS$ID_HIJ, HIJOS$N_PAR_HIJ)
+PAD_V1$llave <- ifelse(!is.na(PAD_V1$ID_HIJ), PAD_V1$ID_HIJ, PAD_V1$N_PAR_HIJ)
+DIADAS_VF <- merge(
+  HIJOS, PAD_V1,
+  by = "llave",
+  all = FALSE,                # no incluye filas sin match (evita NA duplicadores)
+  suffixes = c("_H", "_P")
+)
+DIADAS_VF$FRP_Prementalizacion <- rowMeans(DIADAS_VF[, c("FR1","FR4","FR7","FR10","FR13","FR16")], na.rm = TRUE)
+DIADAS_VF$FRP_Certeza <- rowMeans(DIADAS_VF[, c("FR2","FR5","FR8","FR14","FR17")], na.rm = TRUE)
+DIADAS_VF$FRP_InteresCuriosidad <- rowMeans(DIADAS_VF[, c("FR3","FR6","FR9","FR12","FR15")], na.rm = TRUE)
+DIADAS_VF$REG_Reevaluacion <- rowMeans(DIADAS_VF[, c("RGE1","RGE3","RGE5","RGE7","RGE8","RGE10")], na.rm = TRUE)
+DIADAS_VF$REG_Supresion <- rowMeans(DIADAS_VF[, c("RGE2","RGE4","RGE6","RGE9")], na.rm = TRUE)
+DIADAS_VF$Prosocialidad <- rowMeans(DIADAS_VF[, c("CP1","CP2","CP4","CP5","CP7","CP9","CP12","CP13","CP15")], na.rm = TRUE)
+library(lavaan)
+modelo_diad <- '
+  # Factores latentes a partir de dimensiones
+  FRP =~ FRP_Prementalizacion + FRP_Certeza + FRP_InteresCuriosidad
+  REG =~ REG_Reevaluacion + REG_Supresion
+  REG ~ FRP
+  Prosocialidad~ FRP
+  Prosocialidad~ REG 
+'
+MDIAD_1<- sem(modelo_diad, data = DIADAS_VF,
+           estimator = "MLR")
+summary(MDIAD_1, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE)
+
+
+
+
+
+
+
+
+
+
+fit_final <- sem(modelo_final, 
+                 data = merge(PAD_ANA, REG_ANA, PRO_ANA), 
+                 estimator = "WLSMV", 
+                 ordered = c("FR1","FR2","FR3","FR4","FR5","FR6","FR7","FR8","FR9",
+                             "FR10","FR12","FR13","FR14","FR15","FR16","FR17",
+                             "CP1","CP2","CP4","CP5","CP7","CP9","CP12","CP13","CP15",
+                             "RGE1","RGE2","RGE3","RGE4","RGE5","RGE6","RGE7","RGE8","RGE9","RGE10"))
+
+# Resumen con ajustes y estandarizados
+summary(fit_final, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE)
+
+# Visualización
+library(lavaanPlot)
+lavaanPlot(model = fit_final,
+           node_options = list(shape = "box", fontname = "Helvetica"),
+           edge_options = list(color = "grey"),
+           coefs = TRUE, stand = TRUE, covs = TRUE, stars = "regress")
+
+
+
+
 HI_F_C<- HI_F[!is.na(HI_F$ID_HIJ)   & HI_F$ID_HIJ   != "", ]
 DIAD<- merge(PAD_V1_C, HI_F_C, by = "ID_HIJ")
 items_PAD <- c(

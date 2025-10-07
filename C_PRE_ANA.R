@@ -8,6 +8,7 @@ library(psych)
 library(readxl)
 library(EFAtools)
 library(Amelia)
+library(writexl)
 HIJOS <- read_excel("HIF_09_22.xlsx", sheet = "ANALISIS",na = "999")
 HJ_PRO<- HIJOS[, c("CP1", "CP2", "CP4", "CP5", 
                              "CP7", "CP9", "CP10", "CP12", 
@@ -117,21 +118,31 @@ reliability(PAD_Certeza2)
 alpha(PAD_InteresCuriosidad2)
 reliability(PAD_InteresCuriosidad2)
 #Diadas
+PADRES <- read_excel("PAD_CONSOLIDADO_DEF.xlsx", 
+                     na = "999")
 HIJOS$llave <- ifelse(!is.na(HIJOS$ID_HIJ), HIJOS$ID_HIJ, HIJOS$N_PAR_HIJ)
-PAD_V1$llave <- ifelse(!is.na(PAD_V1$ID_HIJ), PAD_V1$ID_HIJ, PAD_V1$N_PAR_HIJ)
+PADRES$llave <- ifelse(!is.na(PADRES$ID_HIJ), PADRES$ID_HIJ, PADRES$N_PAR_HIJ)
 DIADAS_VF <- merge(
-  HIJOS, PAD_V1,
+  HIJOS, PADRES,
   by = "llave",
   all = FALSE,                # no incluye filas sin match (evita NA duplicadores)
   suffixes = c("_H", "_P")
 )
+write_xlsx(DIADAS_VF, "DIADAS.xlsx")
+DIADAS_316<- read_excel("DIADAS_06_10.xlsx")
 DIADAS_VF$FRP_Prementalizacion <- rowMeans(DIADAS_VF[, c("FR1","FR4","FR7","FR10","FR13","FR16")], na.rm = TRUE)
 DIADAS_VF$FRP_Certeza <- rowMeans(DIADAS_VF[, c("FR2","FR5","FR8","FR14","FR17")], na.rm = TRUE)
 DIADAS_VF$FRP_InteresCuriosidad <- rowMeans(DIADAS_VF[, c("FR3","FR6","FR9","FR12","FR15")], na.rm = TRUE)
 DIADAS_VF$REG_Reevaluacion <- rowMeans(DIADAS_VF[, c("RGE1","RGE3","RGE5","RGE7","RGE8","RGE10")], na.rm = TRUE)
 DIADAS_VF$REG_Supresion <- rowMeans(DIADAS_VF[, c("RGE2","RGE4","RGE6","RGE9")], na.rm = TRUE)
 DIADAS_VF$Prosocialidad <- rowMeans(DIADAS_VF[, c("CP1","CP2","CP4","CP5","CP7","CP9","CP12","CP13","CP15")], na.rm = TRUE)
-library(lavaan)
+DIADAS_PTOT<- DIADAS_VF[, c("FRP_Prementalizacion", 
+                            "FRP_Certeza", 
+                            "FRP_InteresCuriosidad", 
+                            "REG_Reevaluacion", 
+                            "REG_Supresion", 
+                            "Prosocialidad")]
+mvn(DIADAS_PTOT,mvnTest = "mardia", univariateTest = "SW")
 modelo_diad <- '
   # Factores latentes a partir de dimensiones
   FRP =~ FRP_Prementalizacion + FRP_Certeza + FRP_InteresCuriosidad
@@ -140,10 +151,113 @@ modelo_diad <- '
   Prosocialidad~ FRP
   Prosocialidad~ REG 
 '
-MDIAD_1<- sem(modelo_diad, data = DIADAS_VF,
-           estimator = "MLR")
-summary(MDIAD_1, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE)
+modelo_diad_completo <- '
+  ###################################
+  # PADRES: Factores de Reflexión Parental
+  ###################################
+  FRP_Prementalizacion =~ FR1 + FR4 + FR7 + FR10 + FR13 + FR16
+  FRP_Certeza          =~ FR2 + FR5 + FR8 + FR14 + FR17
+  FRP_InteresCuriosidad =~ FR3 + FR6 + FR9 + FR12 + FR15
 
+  ###################################
+  # HIJOS: Regulación emocional
+  ###################################
+  REG_Reevaluacion =~ RGE1 + RGE3 + RGE5 + RGE7 + RGE8 + RGE10
+  REG_Supresion    =~ RGE2 + RGE4 + RGE6 + RGE9
+
+  ###################################
+  # PROSOCIALIDAD
+  ###################################
+  Prosocialidad =~ CP1 + CP2 + CP4 + CP5 + CP7 + CP9 + CP12 + CP13 + CP15
+
+  ###################################
+  # FACTORES DE SEGUNDO ORDEN (PADRES E HIJOS)
+  ###################################
+  FRP =~ FRP_Prementalizacion + FRP_Certeza + FRP_InteresCuriosidad
+  REG =~ REG_Reevaluacion + REG_Supresion
+
+  ###################################
+  # RELACIONES ESTRUCTURALES
+  ###################################
+  REG ~ FRP
+  Prosocialidad ~ FRP + REG
+'
+DIADAS_316_I <- DIADAS_316[, !names(DIADAS_316) %in% c(
+  "FRP_Prementalizacion", "FRP_Certeza", "FRP_InteresCuriosidad",
+  "REG_Reevaluacion", "REG_Supresion", "Prosocialidad"
+)]
+items_modelo <- DIADAS_316_I[, c(
+  paste0("FR", 1:17),
+  paste0("RGE", 1:10),
+  paste0("CP", c(1:15))
+)]
+items_modelo_scaled <- as.data.frame(scale(items_modelo))
+DIADAS_316_scaled <- cbind(DIADAS_316_I[, setdiff(names(DIADAS_316_I), names(items_modelo))],
+                           items_modelo_scaled)
+MDIAD_1 <- sem(modelo_diad_completo,
+               data = DIADAS_316_scaled,
+               estimator = "MLR",
+               missing = "fiml",
+               se = "robust")
+# Cargar librería
+library(seminr)
+
+# --- MODELO DE MEDICIÓN ---
+
+modelo_diad_mm <- constructs(
+  
+  # === Padres (Reflexión Parental) ===
+  composite("Prementalizacion", multi_items("FR", c(1,4,7,10,13,16))),
+  composite("Certeza",          multi_items("FR", c(2,5,8,14,17))),
+  composite("InteresCuriosidad",multi_items("FR", c(3,6,9,12,15))),
+  
+  # === Hijos (Regulación Emocional) ===
+  composite("Reevaluacion", multi_items("RGE", c(1,3,5,7,8,10))),
+  composite("Supresion",    multi_items("RGE", c(2,4,6,9))),
+  
+  # === Prosocialidad ===
+  composite("Prosocialidad", multi_items("CP", c(1,2,4,5,7,9,12,13,15))),
+  
+  # === Constructos de orden superior (reflectivo-reflectivo, método two_stage) ===
+  higher_composite("FRP",
+                   dimensions = c("Prementalizacion", "Certeza", "InteresCuriosidad"),
+                   method = two_stage, weights = mode_A),
+  
+  higher_composite("REG",
+                   dimensions = c("Reevaluacion", "Supresion"),
+                   method = two_stage, weights = mode_A)
+)
+
+# --- MODELO ESTRUCTURAL ---
+modelo_diad_sm <- relationships(
+  paths(from = "FRP", to = c("REG", "Prosocialidad")),
+  paths(from = "REG", to = "Prosocialidad")
+)
+
+# --- ESTIMACIÓN ---
+MDIAD_pls <- estimate_pls(
+  data = DIADAS_316,
+  measurement_model = modelo_diad_mm,
+  structural_model = modelo_diad_sm
+)
+
+# --- RESUMEN ---
+summary(MDIAD_pls)
+
+# --- DIAGRAMA DEL MODELO ---
+plot(MDIAD_pls)
+
+# --- BOOTSTRAP PARA SIGNIFICANCIA ---
+boot_MDIAD <- bootstrap_model(MDIAD_pls, nboot = 1000)
+summary(boot_MDIAD)
+plot(boot_MDIAD)
+
+
+summary(MDIAD_1, fit.measures = TRUE, standardized = TRUE)
+
+summary(MDIAD_1, fit.measures = TRUE, standardized = TRUE)
+summary(MDIAD_1, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE)
+lavaanPlot(model = MDIAD_1,node_options = list(shape = "box", fontname = "Helvetica"), edge_options = list(color = "grey"), coefs = TRUE, stand = TRUE,covs = TRUE, stars = "covs")
 
 
 
@@ -204,6 +318,61 @@ MODELO<-"
     CP ~ FR
     REG ~ FR
     CP ~ REG"
+# Cargar librería
+library(seminr)
+
+# --- MODELO DE MEDICIÓN ---
+
+modelo_diad_mm <- constructs(
+  
+  # === Padres (Reflexión Parental) ===
+  composite("Prementalizacion", multi_items("FR", c(1,4,7,10,13,16))),
+  composite("Certeza",          multi_items("FR", c(2,5,8,14,17))),
+  composite("InteresCuriosidad",multi_items("FR", c(3,6,9,12,15))),
+  
+  # === Hijos (Regulación Emocional) ===
+  composite("Reevaluacion", multi_items("RGE", c(1,3,5,7,8,10))),
+  composite("Supresion",    multi_items("RGE", c(2,4,6,9))),
+  
+  # === Prosocialidad ===
+  composite("Prosocialidad", multi_items("CP", c(1,2,4,5,7,9,12,13,15))),
+  
+  # === Constructos de orden superior (reflectivo-reflectivo, método two_stage) ===
+  higher_composite("FRP",
+                   dimensions = c("Prementalizacion", "Certeza", "InteresCuriosidad"),
+                   method = two_stage, weights = mode_A),
+  
+  higher_composite("REG",
+                   dimensions = c("Reevaluacion", "Supresion"),
+                   method = two_stage, weights = mode_A)
+)
+
+# --- MODELO ESTRUCTURAL ---
+modelo_diad_sm <- relationships(
+  paths(from = "FRP", to = c("REG", "Prosocialidad")),
+  paths(from = "REG", to = "Prosocialidad")
+)
+
+# --- ESTIMACIÓN ---
+MDIAD_pls <- estimate_pls(
+  data = DIADAS_316,
+  measurement_model = modelo_diad_mm,
+  structural_model = modelo_diad_sm
+)
+
+# --- RESUMEN ---
+summary(MDIAD_pls)
+
+# --- DIAGRAMA DEL MODELO ---
+plot(MDIAD_pls)
+
+# --- BOOTSTRAP PARA SIGNIFICANCIA ---
+boot_MDIAD <- bootstrap_model(MDIAD_pls, nboot = 1000)
+summary(boot_MDIAD)
+plot(boot_MDIAD)
+
+
+
 M1<-sem(MODELO, data = DIAD,missing = "ML")
 summary(M1, standardized = TRUE)
 lavaanPlot(M1,coefs = TRUE, stars = "covs",stand = TRUE)

@@ -64,12 +64,15 @@ alpha(HIJOS_REE)
 reliability(HIJOS_REE)
 alpha(HIJOS_SUP)
 reliability(HIJOS_SUP)
-PAD_V1 <- read_excel("PAD_CON_VER1.xlsx", na = "999")
-PAD_FRP<- PAD_V1[, paste0("FR", 1:18)]
-PAD_IMP <- amelia(PAD_FRP, 
-                  ords = c("FR1","FR2","FR3","FR4","FR5","FR6","FR7","FR8","FR9",
-                           "FR10","FR11","FR12","FR13","FR14","FR15","FR16","FR17","FR18"))
-PAD_ANA <- PAD_IMP$imputations$imp3
+#Modelo_Padres
+PAD_DEF <- read_excel("PAD_CONSOLIDADO_DEF.xlsx", na = "999")
+PAD_SUB <- PAD_DEF[, c("Edad", "SEX_1_M_2_F", "Estrato",
+                       "FR1","FR2","FR3","FR4","FR5","FR6","FR7","FR8","FR9",
+                       "FR10","FR11","FR12","FR13","FR14","FR15","FR16","FR17","FR18")]
+PAD_SUB$Edad<-as.numeric(PAD_SUB$Edad)
+PAD_IMP <- amelia(PAD_SUB, idvars = c("SEX_1_M_2_F","Estrato"),ords = c("Edad", "FR1","FR2","FR3","FR4","FR5","FR6","FR7","FR8","FR9",
+                       "FR10","FR11","FR12","FR13","FR14","FR15","FR16","FR17","FR18"))
+PAD_ANA <- as.data.frame(PAD_IMP$imputations$imp3)
 PAD_ANA$FR11R <- 8 - PAD_ANA$FR11
 PAD_ANA$FR18R <- 8 - PAD_ANA$FR18
 modelo_PAD <- '
@@ -117,6 +120,17 @@ alpha(PAD_Certeza2)
 reliability(PAD_Certeza2)
 alpha(PAD_InteresCuriosidad2)
 reliability(PAD_InteresCuriosidad2)
+PAD_ANA$Premetalizacion   <- rowSums(PAD_Prementalizacion2, na.rm = TRUE)
+PAD_ANA$Certeza           <- rowSums(PAD_Certeza2, na.rm = TRUE)
+PAD_ANA$InteresCuriosidad <- rowSums(PAD_InteresCuriosidad2, na.rm = TRUE)
+wilcox.test(Premetalizacion ~ SEX_1_M_2_F, data = PAD_ANA)
+wilcox.test(Certeza ~ SEX_1_M_2_F, data = PAD_ANA)
+wilcox.test(InteresCuriosidad ~ SEX_1_M_2_F, data = PAD_ANA)
+kruskal.test(Premetalizacion ~ Estrato, data = PAD_ANA)
+kruskal.test(Certeza ~ Estrato, data = PAD_ANA)
+kruskal.test(InteresCuriosidad ~ Estrato, data = PAD_ANA)
+
+
 #Diadas
 PADRES <- read_excel("PAD_CONSOLIDADO_DEF.xlsx", 
                      na = "999")
